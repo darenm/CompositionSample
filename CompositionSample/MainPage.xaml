@@ -28,7 +28,8 @@
         </GridView>
 
         <Grid Grid.Row="1">
-            <controls:VisualImage ImageUri="{x:Bind SelectedPhoto.Url, Mode=OneWay}" />
+            <controls:VisualImage ImageUri="{x:Bind SelectedPhoto.Url, Mode=OneWay}"
+                                  ImageMargin="24"/>
         </Grid>
 
     </Grid>

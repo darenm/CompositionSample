@@ -31,6 +31,7 @@ namespace CompositionSample.Controls
         private Visual _rootVisual;
 
         private UriSurface _uriSurface;
+        private DropShadow _foregroundVisualShadow;
 
         public VisualImage()
         {
@@ -114,12 +115,15 @@ namespace CompositionSample.Controls
                     (float) ActualWidth - (float) ImageMargin.Left - (float) ImageMargin.Right,
                     (float) ActualHeight - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
 
-                var dropShadow = _compositor.CreateDropShadow();
-                dropShadow.Color = Color.FromArgb(255, 75, 75, 80);
-                dropShadow.BlurRadius = 15.0f;
-                dropShadow.Offset = new Vector3(2.5f, 2.5f, 0.0f);
-                dropShadow.Mask = _foregroundBrush;
-                ForegroundVisual.Shadow = dropShadow;
+                if (_foregroundVisualShadow == null)
+                {
+                    _foregroundVisualShadow = _compositor.CreateDropShadow();
+                    _foregroundVisualShadow.Color = Color.FromArgb(255, 75, 75, 80);
+                    _foregroundVisualShadow.BlurRadius = 15.0f;
+                    _foregroundVisualShadow.Offset = new Vector3(2.5f, 2.5f, 0.0f);
+                    ForegroundVisual.Shadow = _foregroundVisualShadow;
+                }
+                _foregroundVisualShadow.Mask = _foregroundBrush;
 
                 EnsureOpacityAnimation();
                 ContainerVisual.StartAnimation(nameof(Visual.Opacity), _opacityAnimation);
