@@ -3,6 +3,7 @@ using System.ComponentModel;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Input;
 using CompositionSample.Models;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
@@ -64,6 +65,12 @@ namespace CompositionSample
             {
                 SelectedPhoto = (Photo) PhotosGrid.SelectedItem;
             }
+        }
+
+        private void UIElement_OnTapped(object sender, TappedRoutedEventArgs e)
+        {
+            new ContentDialog {Content = "I was clicked", PrimaryButtonText = "Ok", IsPrimaryButtonEnabled = true}
+                .ShowAsync();
         }
     }
 }

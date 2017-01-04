@@ -11,7 +11,7 @@ using Robmikh.CompositionSurfaceFactory;
 
 namespace CompositionSample.Controls
 {
-    public class VisualImage : UserControl
+    public partial class VisualImage : UserControl
     {
         public static readonly DependencyProperty ImageUriProperty = DependencyProperty.Register(
             "ImageUri", typeof(Uri), typeof(VisualImage), new PropertyMetadata(default(Uri), ImageUriChanged));
@@ -20,6 +20,18 @@ namespace CompositionSample.Controls
             DependencyProperty.Register("ImageMargin", typeof(Thickness), typeof(VisualImage),
                 new PropertyMetadata(new Thickness()));
 
+        public static readonly DependencyProperty ShowBlurredBackgroundProperty = DependencyProperty.Register(
+            "ShowBlurredBackground", typeof(bool), typeof(VisualImage),
+            new PropertyMetadata(true, ShowBlurredBackgroundChanged));
+
+        public static readonly DependencyProperty ImageHorizontalAlignmentProperty = DependencyProperty.Register(
+            "ImageHorizontalAlignment", typeof(HorizontalAlignment), typeof(VisualImage),
+            new PropertyMetadata(default(HorizontalAlignment)));
+
+        public static readonly DependencyProperty ImageVerticalAlignmentProperty = DependencyProperty.Register(
+            "ImageVerticalAlignment", typeof(VerticalAlignment), typeof(VisualImage),
+            new PropertyMetadata(default(VerticalAlignment)));
+
         private static SurfaceFactory _surfaceFactoryInstance;
         private static Compositor _compositor;
         private static ScalarKeyFrameAnimation _opacityAnimation;
@@ -27,14 +39,15 @@ namespace CompositionSample.Controls
         private readonly CompositionEffectBrush _blurBrush;
         private CompositionSurfaceBrush _backgroundBrush;
         private CompositionSurfaceBrush _foregroundBrush;
+        private DropShadow _foregroundVisualShadow;
         private Uri _lastImageUri;
         private Visual _rootVisual;
 
         private UriSurface _uriSurface;
-        private DropShadow _foregroundVisualShadow;
 
         public VisualImage()
         {
+            InitializeComponent();
             EnsureCompositor();
             EnsureSurfaceFactory();
 
@@ -64,6 +77,12 @@ namespace CompositionSample.Controls
         public ContainerVisual ContainerVisual { get; }
         public SpriteVisual ForegroundVisual { get; }
 
+        public HorizontalAlignment ImageHorizontalAlignment
+        {
+            get { return (HorizontalAlignment) GetValue(ImageHorizontalAlignmentProperty); }
+            set { SetValue(ImageHorizontalAlignmentProperty, value); }
+        }
+
         public Thickness ImageMargin
         {
             get { return (Thickness) GetValue(ImageMarginProperty); }
@@ -74,6 +93,18 @@ namespace CompositionSample.Controls
         {
             get { return (Uri) GetValue(ImageUriProperty); }
             set { SetValue(ImageUriProperty, value); }
+        }
+
+        public VerticalAlignment ImageVerticalAlignment
+        {
+            get { return (VerticalAlignment) GetValue(ImageVerticalAlignmentProperty); }
+            set { SetValue(ImageVerticalAlignmentProperty, value); }
+        }
+
+        public bool ShowBlurredBackground
+        {
+            get { return (bool) GetValue(ShowBlurredBackgroundProperty); }
+            set { SetValue(ShowBlurredBackgroundProperty, value); }
         }
 
         public async Task LoadImageAsync(Uri imageUri)
@@ -101,16 +132,55 @@ namespace CompositionSample.Controls
 
                 BackgroundVisual.Brush = _blurBrush;
                 BackgroundVisual.Size = new Vector2((float) ActualWidth, (float) ActualHeight);
+                BackgroundVisual.Opacity = ShowBlurredBackground ? 1.0f : 0;
+
 
                 _foregroundBrush = _compositor.CreateSurfaceBrush(_uriSurface.Surface);
                 _foregroundBrush.Stretch = CompositionStretch.Uniform;
-                _foregroundBrush.HorizontalAlignmentRatio = 0.5f;
-                _foregroundBrush.VerticalAlignmentRatio = 0.5f;
+
+                // center the image
+                switch (ImageHorizontalAlignment)
+                {
+                    case HorizontalAlignment.Left:
+                        _foregroundBrush.HorizontalAlignmentRatio = 0f;
+                        break;
+                    case HorizontalAlignment.Center:
+                        _foregroundBrush.HorizontalAlignmentRatio = 0.5f;
+                        break;
+                    case HorizontalAlignment.Right:
+                        _foregroundBrush.HorizontalAlignmentRatio = 1f;
+                        break;
+                    case HorizontalAlignment.Stretch:
+                        _foregroundBrush.HorizontalAlignmentRatio = 0f;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+
+                switch (ImageVerticalAlignment)
+                {
+                    case VerticalAlignment.Top:
+                        _foregroundBrush.VerticalAlignmentRatio = 0f;
+                        break;
+                    case VerticalAlignment.Center:
+                        _foregroundBrush.VerticalAlignmentRatio = 0.5f;
+                        break;
+                    case VerticalAlignment.Bottom:
+                        _foregroundBrush.VerticalAlignmentRatio = 1f;
+                        break;
+                    case VerticalAlignment.Stretch:
+                        _foregroundBrush.HorizontalAlignmentRatio = 0f;
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
 
                 ForegroundVisual.Brush = _foregroundBrush;
 
                 // creating a margin around the image
                 ForegroundVisual.Offset = new Vector3((float) ImageMargin.Left, (float) ImageMargin.Top, 0);
+
+                // ensure the image size accounts for the margin
                 ForegroundVisual.Size = new Vector2(
                     (float) ActualWidth - (float) ImageMargin.Left - (float) ImageMargin.Right,
                     (float) ActualHeight - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
@@ -191,6 +261,17 @@ namespace CompositionSample.Controls
         {
             var instance = (VisualImage) dependencyObject;
             var unused = instance.LoadImageAsync(dependencyPropertyChangedEventArgs.NewValue as Uri);
+        }
+
+        private void RefreshView()
+        {
+            BackgroundVisual.Opacity = ShowBlurredBackground ? 1.0f : 0;
+        }
+
+        private static void ShowBlurredBackgroundChanged(DependencyObject dependencyObject,
+            DependencyPropertyChangedEventArgs dependencyPropertyChangedEventArgs)
+        {
+            ((VisualImage) dependencyObject).RefreshView();
         }
 
         private void VisualImage_Loaded(object sender, RoutedEventArgs e)

@@ -5,7 +5,6 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:CompositionSample.Models"
-    xmlns:ui="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:controls="using:CompositionSample.Controls"
     mc:Ignorable="d">
 
@@ -19,17 +18,22 @@
                   x:Name="PhotosGrid"
                   Grid.Row="0">
             <GridView.ItemTemplate>
-                <ui:DataTemplate x:DataType="models:Photo">
+                <DataTemplate x:DataType="models:Photo">
                     <Image Source="{x:Bind PhotoSource}"
                            Height="300"
                            Stretch="Uniform" />
-                </ui:DataTemplate>
+                </DataTemplate>
             </GridView.ItemTemplate>
         </GridView>
 
         <Grid Grid.Row="1">
             <controls:VisualImage ImageUri="{x:Bind SelectedPhoto.Url, Mode=OneWay}"
-                                  ImageMargin="24"/>
+                                         ImageHorizontalAlignment="Center"
+                                         IsHitTestVisible="True"
+                                         Background="White"
+                                         ImageMargin="24"
+                                         Tapped="UIElement_OnTapped"/>
+            <!--<controls:MyUserControl1/>-->
         </Grid>
 
     </Grid>

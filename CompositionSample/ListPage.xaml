@@ -21,9 +21,10 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:Photo">
                     <controls:VisualImage ImageUri="{x:Bind Url, Mode=OneWay}"
-                                          Height="200"
-                                          HorizontalAlignment="Stretch"
-                                          ImageMargin="8"/>
+                                                 Height="200"
+                                                 Background="White"
+                                                 ImageHorizontalAlignment="Center"
+                                                 ImageMargin="8" />
 
                 </DataTemplate>
             </ListView.ItemTemplate>

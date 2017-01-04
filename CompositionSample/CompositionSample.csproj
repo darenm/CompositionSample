@@ -95,7 +95,9 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Controls\VisualImage.cs" />
+    <Compile Include="Controls\VisualImage.xaml.cs">
+      <DependentUpon>VisualImage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ListPage.xaml.cs">
       <DependentUpon>ListPage.xaml</DependentUpon>
     </Compile>
@@ -139,6 +141,10 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Page Include="Controls\VisualImage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ListPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
