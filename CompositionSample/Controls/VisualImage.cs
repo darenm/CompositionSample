@@ -1,36 +1,41 @@
 ﻿using System;
 using System.Numerics;
 using System.Threading.Tasks;
+using Windows.UI;
 using Windows.UI.Composition;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Hosting;
-using Robmikh.CompositionSurfaceFactory;
 using Microsoft.Graphics.Canvas.Effects;
-using Windows.UI;
+using Robmikh.CompositionSurfaceFactory;
 
-namespace Pixels.Controls
+namespace CompositionSample.Controls
 {
     public class VisualImage : UserControl
     {
         public static readonly DependencyProperty ImageUriProperty = DependencyProperty.Register(
             "ImageUri", typeof(Uri), typeof(VisualImage), new PropertyMetadata(default(Uri), ImageUriChanged));
 
-        private SurfaceFactory _surfaceFactoryInstance;
+        public static readonly DependencyProperty ImageMarginProperty =
+            DependencyProperty.Register("ImageMargin", typeof(Thickness), typeof(VisualImage),
+                new PropertyMetadata(new Thickness()));
 
-        private Compositor _compositor;
-        private CompositionEffectBrush _blurBrush;
+        private static SurfaceFactory _surfaceFactoryInstance;
+        private static Compositor _compositor;
+        private static ScalarKeyFrameAnimation _opacityAnimation;
 
-        private UriSurface _uriSurface;
-        private Visual _rootVisual;
-        private Uri _lastImageUri;
+        private readonly CompositionEffectBrush _blurBrush;
         private CompositionSurfaceBrush _backgroundBrush;
         private CompositionSurfaceBrush _foregroundBrush;
+        private Uri _lastImageUri;
+        private Visual _rootVisual;
+
+        private UriSurface _uriSurface;
 
         public VisualImage()
         {
-            _compositor = ElementCompositionPreview.GetElementVisual(this).Compositor;
-            _surfaceFactoryInstance = SurfaceFactory.CreateFromCompositor(_compositor);
+            EnsureCompositor();
+            EnsureSurfaceFactory();
 
             _rootVisual = ElementCompositionPreview.GetElementVisual(this);
             BackgroundVisual = _compositor.CreateSpriteVisual();
@@ -42,56 +47,32 @@ namespace Pixels.Controls
             SizeChanged +=
                 (s, args) =>
                 {
-                    BackgroundVisual.Size = new Vector2((float)args.NewSize.Width, (float)args.NewSize.Height);
-                    ForegroundVisual.Size = new Vector2((float)args.NewSize.Width - 48, (float)args.NewSize.Height - 48);
+                    BackgroundVisual.Size = new Vector2((float) args.NewSize.Width, (float) args.NewSize.Height);
+                    ForegroundVisual.Size = new Vector2(
+                        (float) args.NewSize.Width - (float) ImageMargin.Left - (float) ImageMargin.Right,
+                        (float) args.NewSize.Height - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
                 };
 
             _blurBrush = BuildBlurBrush();
 
             Loaded += VisualImage_Loaded;
-
             Unloaded += VisualImage_Unloaded;
         }
 
-        private void VisualImage_Loaded(object sender, RoutedEventArgs e)
+        public SpriteVisual BackgroundVisual { get; }
+        public ContainerVisual ContainerVisual { get; }
+        public SpriteVisual ForegroundVisual { get; }
+
+        public Thickness ImageMargin
         {
+            get { return (Thickness) GetValue(ImageMarginProperty); }
+            set { SetValue(ImageMarginProperty, value); }
         }
-
-
-        private void VisualImage_Unloaded(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                ElementCompositionPreview.SetElementChildVisual(this, null);
-                _backgroundBrush?.Dispose();
-                _foregroundBrush?.Dispose();
-                BackgroundVisual?.Dispose();
-                ForegroundVisual?.Dispose();
-                ContainerVisual?.Dispose();
-                _uriSurface?.Dispose();
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-
 
         public Uri ImageUri
         {
-            get { return (Uri)GetValue(ImageUriProperty); }
+            get { return (Uri) GetValue(ImageUriProperty); }
             set { SetValue(ImageUriProperty, value); }
-        }
-
-        public SpriteVisual BackgroundVisual { get; private set; }
-        public SpriteVisual ForegroundVisual { get; private set; }
-        public ContainerVisual ContainerVisual { get; private set; }
-
-        private static void ImageUriChanged(DependencyObject dependencyObject,
-            DependencyPropertyChangedEventArgs dependencyPropertyChangedEventArgs)
-        {
-            var instance = (VisualImage)dependencyObject;
-            var unused = instance.LoadImageAsync(dependencyPropertyChangedEventArgs.NewValue as Uri);
         }
 
         public async Task LoadImageAsync(Uri imageUri)
@@ -118,7 +99,7 @@ namespace Pixels.Controls
                 _blurBrush.SetSourceParameter("source", _backgroundBrush);
 
                 BackgroundVisual.Brush = _blurBrush;
-                BackgroundVisual.Size = new Vector2((float)ActualWidth, (float)ActualHeight);
+                BackgroundVisual.Size = new Vector2((float) ActualWidth, (float) ActualHeight);
 
                 _foregroundBrush = _compositor.CreateSurfaceBrush(_uriSurface.Surface);
                 _foregroundBrush.Stretch = CompositionStretch.Uniform;
@@ -128,9 +109,10 @@ namespace Pixels.Controls
                 ForegroundVisual.Brush = _foregroundBrush;
 
                 // creating a margin around the image
-                // TODO: Make dep prop for Margin 
-                ForegroundVisual.Offset = new Vector3(24f, 24f, 0);
-                ForegroundVisual.Size = new Vector2((float)ActualWidth-48, (float)ActualHeight-48);
+                ForegroundVisual.Offset = new Vector3((float) ImageMargin.Left, (float) ImageMargin.Top, 0);
+                ForegroundVisual.Size = new Vector2(
+                    (float) ActualWidth - (float) ImageMargin.Left - (float) ImageMargin.Right,
+                    (float) ActualHeight - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
 
                 var dropShadow = _compositor.CreateDropShadow();
                 dropShadow.Color = Color.FromArgb(255, 75, 75, 80);
@@ -139,11 +121,8 @@ namespace Pixels.Controls
                 dropShadow.Mask = _foregroundBrush;
                 ForegroundVisual.Shadow = dropShadow;
 
-                var opacityAnimation = _compositor.CreateScalarKeyFrameAnimation();
-                opacityAnimation.InsertKeyFrame(0f, 0f);
-                opacityAnimation.InsertKeyFrame(1f, 1f);
-                opacityAnimation.Duration = TimeSpan.FromMilliseconds(400);
-                ContainerVisual.StartAnimation(nameof(Visual.Opacity), opacityAnimation);
+                EnsureOpacityAnimation();
+                ContainerVisual.StartAnimation(nameof(Visual.Opacity), _opacityAnimation);
             }
             catch
             {
@@ -165,7 +144,7 @@ namespace Pixels.Controls
             var blendEffect = new BlendEffect
             {
                 Background = blurEffect,
-                Foreground = new ColorSourceEffect { Name = "Color", Color = Color.FromArgb(64, 255, 255, 255) },
+                Foreground = new ColorSourceEffect {Name = "Color", Color = Color.FromArgb(64, 255, 255, 255)},
                 Mode = BlendEffectMode.SoftLight
             };
 
@@ -176,7 +155,62 @@ namespace Pixels.Controls
             };
 
             var factory = _compositor.CreateEffectFactory(saturationEffect);
-            return factory.CreateBrush(); 
+            return factory.CreateBrush();
+        }
+
+        private void EnsureCompositor()
+        {
+            if (_compositor == null)
+            {
+                _compositor = ElementCompositionPreview.GetElementVisual(this).Compositor;
+            }
+        }
+
+        private static void EnsureOpacityAnimation()
+        {
+            _opacityAnimation = _compositor.CreateScalarKeyFrameAnimation();
+            _opacityAnimation.InsertKeyFrame(0f, 0f);
+            _opacityAnimation.InsertKeyFrame(1f, 1f);
+            _opacityAnimation.Duration = TimeSpan.FromMilliseconds(400);
+        }
+
+        private static void EnsureSurfaceFactory()
+        {
+            if (_surfaceFactoryInstance == null)
+            {
+                _surfaceFactoryInstance = SurfaceFactory.CreateFromCompositor(_compositor);
+            }
+        }
+
+        private static void ImageUriChanged(DependencyObject dependencyObject,
+            DependencyPropertyChangedEventArgs dependencyPropertyChangedEventArgs)
+        {
+            var instance = (VisualImage) dependencyObject;
+            var unused = instance.LoadImageAsync(dependencyPropertyChangedEventArgs.NewValue as Uri);
+        }
+
+        private void VisualImage_Loaded(object sender, RoutedEventArgs e)
+        {
+        }
+
+
+        private void VisualImage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ElementCompositionPreview.SetElementChildVisual(this, null);
+                _backgroundBrush?.Dispose();
+                _foregroundBrush?.Dispose();
+                BackgroundVisual?.Dispose();
+                ForegroundVisual?.Dispose();
+                ContainerVisual?.Dispose();
+                _uriSurface?.Dispose();
+                _opacityAnimation?.Dispose();
+            }
+            catch
+            {
+                // ignored
+            }
         }
     }
 }

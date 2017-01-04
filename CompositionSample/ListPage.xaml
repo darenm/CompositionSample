@@ -6,7 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:CompositionSample.Models"
-    xmlns:controls="using:Pixels.Controls"
+    xmlns:controls="using:CompositionSample.Controls"
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
@@ -15,14 +15,14 @@
                   Grid.Row="0">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:Photo">
                     <controls:VisualImage ImageUri="{x:Bind Url, Mode=OneWay}"
                                           Height="200"
-                                          HorizontalAlignment="Stretch"/>
+                                          HorizontalAlignment="Stretch" />
 
                 </DataTemplate>
             </ListView.ItemTemplate>
