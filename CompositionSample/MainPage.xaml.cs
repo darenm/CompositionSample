@@ -1,9 +1,11 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Input;
+using CompositionSample.Controls;
 using CompositionSample.Models;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
@@ -69,8 +71,24 @@ namespace CompositionSample
 
         private void UIElement_OnTapped(object sender, TappedRoutedEventArgs e)
         {
-            new ContentDialog {Content = "I was clicked", PrimaryButtonText = "Ok", IsPrimaryButtonEnabled = true}
-                .ShowAsync();
+            var visualImage = (VisualImage) sender;
+            switch(visualImage.ImageHorizontalAlignment)
+            {
+                case HorizontalAlignment.Left:
+                    visualImage.ImageHorizontalAlignment = HorizontalAlignment.Center;
+                    break;
+                case HorizontalAlignment.Center:
+                    visualImage.ImageHorizontalAlignment = HorizontalAlignment.Right;
+                    break;
+                case HorizontalAlignment.Right:
+                    visualImage.ImageHorizontalAlignment = HorizontalAlignment.Left;
+                    break;
+                case HorizontalAlignment.Stretch:
+                    visualImage.ImageHorizontalAlignment = HorizontalAlignment.Left;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
     }
 }
