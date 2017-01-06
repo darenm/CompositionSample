@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Windows.UI;
@@ -18,7 +19,7 @@ namespace CompositionSample.Controls
 
         public static readonly DependencyProperty ImageMarginProperty =
             DependencyProperty.Register("ImageMargin", typeof(Thickness), typeof(VisualImage),
-                new PropertyMetadata(new Thickness()));
+                new PropertyMetadata(new Thickness(), ImageMarginPropertyChanged));
 
         public static readonly DependencyProperty ShowBlurredBackgroundProperty = DependencyProperty.Register(
             "ShowBlurredBackground", typeof(bool), typeof(VisualImage),
@@ -40,10 +41,11 @@ namespace CompositionSample.Controls
         private CompositionSurfaceBrush _backgroundBrush;
         private CompositionSurfaceBrush _foregroundBrush;
         private DropShadow _foregroundVisualShadow;
+        private float _lastHorizontalAlignmentRatio;
         private Visual _rootVisual;
 
         private UriSurface _uriSurface;
-        private float _lastHorizontalAlignmentRatio;
+        private bool _firstTimeLoad;
 
         public VisualImage()
         {
@@ -75,7 +77,7 @@ namespace CompositionSample.Controls
 
         public SpriteVisual BackgroundVisual { get; }
         public ContainerVisual ContainerVisual { get; }
-        public SpriteVisual ForegroundVisual { get; }
+        public SpriteVisual ForegroundVisual { get; private set; }
 
         public HorizontalAlignment ImageHorizontalAlignment
         {
@@ -107,14 +109,41 @@ namespace CompositionSample.Controls
             set { SetValue(ShowBlurredBackgroundProperty, value); }
         }
 
+        public void AttachVisual(SpriteVisual foregroundVisual)
+        {
+            if (ForegroundVisual != null)
+            {
+                if (ContainerVisual.Children.Contains(ForegroundVisual))
+                {
+                    ContainerVisual.Children.Remove(ForegroundVisual);
+                }
+                ForegroundVisual = null;
+            }
+            ForegroundVisual = foregroundVisual;
+            ContainerVisual.Children.InsertAtTop(ForegroundVisual);
+            ForegroundVisual.Offset = Vector3.Zero;
+            //RefreshView();
+        }
+
+        public event EventHandler ImageLoaded;
+
         public async Task LoadImageAsync()
         {
             try
             {
                 await RenderImageAsync();
 
+                if (!_firstTimeLoad)
+                {
+                    ImageLoaded?.Invoke(this, EventArgs.Empty);
+                    return;
+                }
+
+                var batch = _compositor.CreateScopedBatch(CompositionBatchTypes.Animation);
                 EnsureOpacityAnimation();
                 ContainerVisual.StartAnimation(nameof(Visual.Opacity), _opacityAnimation);
+                batch.Completed += (sender, args) => ImageLoaded?.Invoke(this, EventArgs.Empty);
+                batch.End();
             }
             catch
             {
@@ -122,17 +151,13 @@ namespace CompositionSample.Controls
             }
         }
 
-        private async Task RenderImageAsync()
+        private static void AlignmentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            if (_uriSurface == null)
-            {
-                _uriSurface = await _surfaceFactoryInstance.CreateUriSurfaceAsync(ImageUri);
-            }
-            else
-            {
-                await _uriSurface.RedrawSurfaceAsync(ImageUri);
-            }
+            ((VisualImage) d).HandleAlignments();
+        }
 
+        private void BuildBackground()
+        {
             _backgroundBrush = _compositor.CreateSurfaceBrush(_uriSurface.Surface);
             _backgroundBrush.Stretch = CompositionStretch.Fill;
             _blurBrush.SetSourceParameter("source", _backgroundBrush);
@@ -140,44 +165,6 @@ namespace CompositionSample.Controls
             BackgroundVisual.Brush = _blurBrush;
             BackgroundVisual.Size = new Vector2((float) ActualWidth, (float) ActualHeight);
             BackgroundVisual.Opacity = ShowBlurredBackground ? 1.0f : 0;
-
-
-            _foregroundBrush = _compositor.CreateSurfaceBrush(_uriSurface.Surface);
-            _foregroundBrush.Stretch = CompositionStretch.Uniform;
-
-
-            ForegroundVisual.Brush = _foregroundBrush;
-
-            // ensure the image size accounts for the margin
-            ForegroundVisual.Size = new Vector2(
-                (float) ActualWidth - (float) ImageMargin.Left - (float) ImageMargin.Right,
-                (float) ActualHeight - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
-
-            HandleAlignments();
-
-
-            if (_foregroundVisualShadow == null)
-            {
-                _foregroundVisualShadow = _compositor.CreateDropShadow();
-                _foregroundVisualShadow.Color = Color.FromArgb(255, 75, 75, 80);
-                _foregroundVisualShadow.BlurRadius = 15.0f;
-                _foregroundVisualShadow.Offset = new Vector3(2.5f, 2.5f, 0.0f);
-                ForegroundVisual.Shadow = _foregroundVisualShadow;
-            }
-            _foregroundVisualShadow.Mask = _foregroundBrush;
-
-            var offsetAnimation = _compositor.CreateVector3KeyFrameAnimation();
-            offsetAnimation.Target = nameof(Visual.Offset);
-            offsetAnimation.InsertExpressionKeyFrame(1.0f, "this.FinalValue");
-            offsetAnimation.Duration = TimeSpan.FromMilliseconds(1500);
-            var foregroundVisualImplicitAnimations = _compositor.CreateImplicitAnimationCollection();
-            foregroundVisualImplicitAnimations[nameof(Visual.Offset)] = offsetAnimation;
-            ForegroundVisual.ImplicitAnimations = foregroundVisualImplicitAnimations;
-        }
-
-        private static void AlignmentChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            ((VisualImage) d).HandleAlignments();
         }
 
         private CompositionEffectBrush BuildBlurBrush()
@@ -208,6 +195,40 @@ namespace CompositionSample.Controls
             return factory.CreateBrush();
         }
 
+        private void BuildForeground()
+        {
+            _foregroundBrush = _compositor.CreateSurfaceBrush(_uriSurface.Surface);
+            _foregroundBrush.Stretch = CompositionStretch.Uniform;
+
+
+            ForegroundVisual.Brush = _foregroundBrush;
+
+            // ensure the image size accounts for the margin
+            ForegroundVisual.Size = new Vector2(
+                (float) ActualWidth - (float) ImageMargin.Left - (float) ImageMargin.Right,
+                (float) ActualHeight - (float) ImageMargin.Top - (float) ImageMargin.Bottom);
+
+            HandleAlignments();
+
+            if (_foregroundVisualShadow == null)
+            {
+                _foregroundVisualShadow = _compositor.CreateDropShadow();
+                _foregroundVisualShadow.Color = Color.FromArgb(255, 75, 75, 80);
+                _foregroundVisualShadow.BlurRadius = 15.0f;
+                _foregroundVisualShadow.Offset = new Vector3(2.5f, 2.5f, 0.0f);
+                ForegroundVisual.Shadow = _foregroundVisualShadow;
+            }
+            _foregroundVisualShadow.Mask = _foregroundBrush;
+
+            var offsetAnimation = _compositor.CreateVector3KeyFrameAnimation();
+            offsetAnimation.Target = nameof(Visual.Offset);
+            offsetAnimation.InsertExpressionKeyFrame(1.0f, "this.FinalValue");
+            offsetAnimation.Duration = TimeSpan.FromMilliseconds(1500);
+            var foregroundVisualImplicitAnimations = _compositor.CreateImplicitAnimationCollection();
+            foregroundVisualImplicitAnimations[nameof(Visual.Offset)] = offsetAnimation;
+            ForegroundVisual.ImplicitAnimations = foregroundVisualImplicitAnimations;
+        }
+
         private void EnsureCompositor()
         {
             if (_compositor == null)
@@ -235,7 +256,9 @@ namespace CompositionSample.Controls
         private void HandleAlignments()
         {
             if (_foregroundBrush == null)
+            {
                 return;
+            }
 
             _foregroundBrush.HorizontalAlignmentRatio = 0f;
             var leftOffset = (float) ImageMargin.Left;
@@ -292,6 +315,11 @@ namespace CompositionSample.Controls
             _lastHorizontalAlignmentRatio = targetHorizontalAlignmentRatio;
         }
 
+        private static void ImageMarginPropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            ((VisualImage) d).HandleAlignments();
+        }
+
         private static void ImageUriChanged(DependencyObject dependencyObject,
             DependencyPropertyChangedEventArgs dependencyPropertyChangedEventArgs)
         {
@@ -299,9 +327,30 @@ namespace CompositionSample.Controls
             var unused = instance.LoadImageAsync();
         }
 
+        private async Task LoadImage()
+        {
+            if (_uriSurface == null)
+            {
+                _firstTimeLoad = true;
+                _uriSurface = await _surfaceFactoryInstance.CreateUriSurfaceAsync(ImageUri);
+            }
+            else
+            {
+                _firstTimeLoad = false;
+                await _uriSurface.RedrawSurfaceAsync(ImageUri);
+            }
+        }
+
         private void RefreshView()
         {
             BackgroundVisual.Opacity = ShowBlurredBackground ? 1.0f : 0;
+        }
+
+        private async Task RenderImageAsync()
+        {
+            await LoadImage();
+            BuildBackground();
+            BuildForeground();
         }
 
         private static void ShowBlurredBackgroundChanged(DependencyObject dependencyObject,
@@ -321,11 +370,11 @@ namespace CompositionSample.Controls
             {
                 ElementCompositionPreview.SetElementChildVisual(this, null);
                 _backgroundBrush?.Dispose();
-                _foregroundBrush?.Dispose();
+                //_foregroundBrush?.Dispose();
                 BackgroundVisual?.Dispose();
                 ForegroundVisual?.Dispose();
                 ContainerVisual?.Dispose();
-                _uriSurface?.Dispose();
+                //_uriSurface?.Dispose();
                 _opacityAnimation?.Dispose();
             }
             catch

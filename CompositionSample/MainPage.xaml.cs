@@ -5,8 +5,10 @@ using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Navigation;
 using CompositionSample.Controls;
 using CompositionSample.Models;
+using CompositionSample.Services;
 
 // The Blank Page item template is documented at https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -45,6 +47,14 @@ namespace CompositionSample
             }
         }
 
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            if (!ConnectedVisualService.IsInitialized)
+            {
+                ConnectedVisualService.Initialize(Frame);
+            }
+        }
+
         #region INotifyPropertyChanged Members
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -72,7 +82,22 @@ namespace CompositionSample
         private void UIElement_OnTapped(object sender, TappedRoutedEventArgs e)
         {
             var visualImage = (VisualImage) sender;
-            switch(visualImage.ImageHorizontalAlignment)
+            //ToggleHorizontalAlignment(visualImage);
+
+            if (ConnectedVisualService.Instance.HasFloatingVisual)
+            {
+                ConnectedVisualService.Instance.AttachVisual(visualImage);
+            }
+            else
+            {
+                ConnectedVisualService.Instance.DetachVisual(visualImage);
+                Frame.Navigate(typeof(DetailPage));
+            }
+        }
+
+        private static void ToggleHorizontalAlignment(VisualImage visualImage)
+        {
+            switch (visualImage.ImageHorizontalAlignment)
             {
                 case HorizontalAlignment.Left:
                     visualImage.ImageHorizontalAlignment = HorizontalAlignment.Center;
